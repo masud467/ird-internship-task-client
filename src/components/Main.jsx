@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FaSearch } from "react-icons/fa";
 import { BiCopy, BiBookmark, BiShareAlt } from "react-icons/bi";
 import { IoBulbOutline } from "react-icons/io5";
@@ -28,6 +28,8 @@ const Main = () => {
     categoryData: {},
     subcategoryData: {},
   });
+  const [selectedDuaId, setSelectedDuaId] = useState(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,23 +90,21 @@ const Main = () => {
   }, []);
   // ====================================================================================
   const handleContentSelect = (selection) => {
+    let filteredDuasData = [];
+    let newSelectedDuaId = null;
     switch (selection.type) {
       case "category": {
-        const categoryDuas = duas.filter((dua) => dua.cat_id === selection.id);
+        filteredDuasData = duas.filter((dua) => dua.cat_id === selection.id);
         const category = categories.find((cat) => cat.cat_id === selection.id);
-        setFilteredDuas(categoryDuas);
         setSelectedCategory(category?.cat_name_en || "");
         setSelectedSubcategory("");
         break;
       }
       case "subcategory": {
-        const subcategoryDuas = duas.filter(
-          (dua) => dua.subcat_id === selection.id
-        );
+        filteredDuasData = duas.filter((dua) => dua.subcat_id === selection.id);
         const subcategory = subcategories.find(
           (sub) => sub.subcat_id === selection.id
         );
-        setFilteredDuas(subcategoryDuas);
         const category = categories.find(
           (cat) => cat.cat_id === subcategory?.cat_id
         );
@@ -113,14 +113,57 @@ const Main = () => {
         break;
       }
       case "dua": {
-        const selectedDua = duas.filter((dua) => dua.dua_id === selection.id);
-        setFilteredDuas(selectedDua);
+        newSelectedDuaId = selection.id;
+        // Find the subcategory of the selected dua
+        const selectedDua = duas.find((dua) => dua.dua_id === selection.id);
+        if (selectedDua) {
+          filteredDuasData = duas.filter(
+            (dua) => dua.subcat_id === selectedDua.subcat_id
+          );
+          const subcategory = subcategories.find(
+            (sub) => sub.subcat_id === selectedDua.subcat_id
+          );
+          const category = categories.find(
+            (cat) => cat.cat_id === subcategory?.cat_id
+          );
+          setSelectedCategory(category?.cat_name_en || "");
+          setSelectedSubcategory(subcategory?.subcat_name_en || "");
+        }
         break;
       }
       default:
-        setFilteredDuas(duas);
+        filteredDuasData = duas;
     }
+    setFilteredDuas(filteredDuasData);
+    setSelectedDuaId(selectedDuaId); // Add this state to track the selected dua
     setIsDrawerOpen(false);
+
+    setTimeout(() => {
+      if (newSelectedDuaId) {
+        scrollToDua(newSelectedDuaId);
+      } else if (filteredDuasData.length > 0) {
+        // Scroll to top of the list if no specific dua selected
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }, 100);
+  };
+
+  // New scroll function that ensures full dua visibility
+  const scrollToDua = (duaId) => {
+    const element = document.getElementById(`dua-${duaId}`);
+    if (element && scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const elementRect = element.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      // Calculate position to show the entire dua card from top
+      const scrollPosition = element.offsetTop - container.offsetTop - 20; // 20px padding
+
+      container.scrollTo({
+        top: scrollPosition,
+        behavior: "smooth",
+      });
+    }
   };
 
   // ====================================================================================
@@ -128,12 +171,15 @@ const Main = () => {
   const renderDuaCard = (dua, index) => (
     <div
       key={`${dua.cat_id}-${dua.subcat_id}-${dua.dua_id}-${index}`}
-      className="bg-white rounded-lg py-4 px-7 space-y-2 border transition-all duration-300 ease-in-out flex flex-col gap-[28px]"
+      className={`bg-white rounded-lg py-4 px-7 space-y-2 border transition-all duration-300 ease-in-out flex flex-col gap-[28px] ${
+        dua.dua_id === selectedDuaId ? "ring-2 ring-green-500" : ""
+      }`}
+      id={`dua-${dua.dua_id}`}
     >
       <div className="flex gap-5">
         <Image
           src={image}
-          alt="Image Icon"
+          alt="image Icon"
           className=" rounded-full"
           width={30}
           height={30}
@@ -195,6 +241,18 @@ const Main = () => {
     </div>
   );
 
+  // Add this useEffect to scroll to the selected dua:
+  useEffect(() => {
+    if (selectedDuaId) {
+      setTimeout(() => {
+        const element = document.getElementById(`dua-${selectedDuaId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      }, 100);
+    }
+  }, [selectedDuaId]);
+
   return (
     <div className="bg-[#EBEEF2] h-screen py-10 overflow-hidden">
       {/* Mobile Drawer */}
@@ -240,7 +298,10 @@ const Main = () => {
             </div>
           </div>
 
-          <div className="overflow-y-auto h-[60vh] scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-gray-300">
+          <div
+            ref={scrollContainerRef}
+            className="overflow-y-auto h-[60vh] scrollbar-thin scrollbar-thumb-rounded scrollbar-thumb-gray-300"
+          >
             <div className="min-h-[600px] transition-all duration-300 ease-in-out">
               {selectedCategory && (
                 <div className="bg-green-100 text-green-700 font-semibold text-lg rounded-md py-2 px-4 mb-4 transition-opacity duration-300">

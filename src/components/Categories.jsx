@@ -7,144 +7,138 @@ import { FiLayers } from "react-icons/fi";
 
 const Categories = ({ onSelectContent }) => {
   const router = useRouter();
-  const [categories, setCategories] = useState([]);
+  const [data, setData] = useState({
+    categories: [],
+    subcategories: [],
+    duas: []
+  });
   const [searchQuery, setSearchQuery] = useState("");
-  const [subcategories, setSubcategories] = useState([]);
-  const [duas, setDuas] = useState([]);
-  const [expandedCategoryId, setExpandedCategoryId] = useState(null);
-  const [expandedSubcategoryId, setExpandedSubcategoryId] = useState(null);
-
+  const [expandedIds, setExpandedIds] = useState({
+    category: null,
+    subcategory: null
+  });
+  
   const scrollContainerRef = useRef(null);
   const categoryRefs = useRef({});
+  const isInitialInteraction = useRef(true);
 
   useEffect(() => {
-    // Load saved states from localStorage
     const savedState = localStorage.getItem("categoryState");
     if (savedState) {
       const { categoryId, subcategoryId } = JSON.parse(savedState);
-
+      setExpandedIds({ category: categoryId, subcategory: subcategoryId });
+      
       setTimeout(() => {
-        if (categoryRefs.current[categoryId]) {
-          categoryRefs.current[categoryId].scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
+        if (categoryId && categoryRefs.current[categoryId]) {
+          scrollToElement(categoryRefs.current[categoryId]);
         }
       }, 100);
-
-      setExpandedCategoryId(categoryId);
-      setExpandedSubcategoryId(subcategoryId);
     }
 
     const fetchData = async () => {
       try {
-        const [categoriesResponse, subcategoriesResponse, duasResponse] =
-          await Promise.all([
-            fetch("http://localhost:3003/categories"),
-            fetch("http://localhost:3003/subcategories"),
-            fetch("http://localhost:3003/duas"),
-          ]);
-
-        const [categoriesData, subcategoriesData, duasData] = await Promise.all(
-          [
-            categoriesResponse.json(),
-            subcategoriesResponse.json(),
-            duasResponse.json(),
-          ]
-        );
-
-        setCategories(categoriesData);
-        setSubcategories(subcategoriesData);
-        setDuas(duasData);
+        const [categories, subcategories, duas] = await Promise.all([
+          fetch("http://localhost:3003/categories").then(res => res.json()),
+          fetch("http://localhost:3003/subcategories").then(res => res.json()),
+          fetch("http://localhost:3003/duas").then(res => res.json())
+        ]);
+        setData({ categories, subcategories, duas });
       } catch (error) {
         console.error("Error fetching data:", error);
       }
     };
     fetchData();
-  }, [categories]);
+  }, []);
 
-  const handleCategoryClick = (categoryId, categoryName) => {
-    setExpandedCategoryId(categoryId);
-    setExpandedSubcategoryId(null);
-
-    // Scroll to clicked category smoothly
-    if (categoryRefs.current[categoryId]) {
-      categoryRefs.current[categoryId].scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
+  const scrollToElement = (element) => {
+    if (!scrollContainerRef.current || !element) return;
+    
+    const container = scrollContainerRef.current;
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    
+    // Only scroll if element is not fully visible
+    if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-
-    // Save state to localStorage
-    localStorage.setItem(
-      "categoryState",
-      JSON.stringify({
-        categoryId,
-        subcategoryId: null,
-      })
-    );
-
-    onSelectContent({ type: "category", id: categoryId });
   };
 
-  const handleSubcategoryClick = (
-    categoryId,
-    categoryName,
-    subcatId,
-    event
-  ) => {
-    event.stopPropagation();
-    setExpandedSubcategoryId(subcatId);
-
-    // Save state to localStorage
-    localStorage.setItem(
-      "categoryState",
-      JSON.stringify({
-        categoryId,
-        subcategoryId: subcatId,
-      })
-    );
-    onSelectContent({ type: "subcategory", id: subcatId });
+  const handleCategoryClick = (category) => {
+    const prevScroll = scrollContainerRef.current?.scrollTop;
+    const newState = {
+      category: expandedIds.category === category.cat_id ? null : category.cat_id,
+      subcategory: null
+    };
+    
+    setExpandedIds(newState);
+    saveState(newState);
+    updateUrl(category.cat_id, category.cat_name_en);
+    
+    setTimeout(() => {
+      if (isInitialInteraction.current) {
+        if (categoryRefs.current[category.cat_id]) {
+          scrollToElement(categoryRefs.current[category.cat_id]);
+        }
+        isInitialInteraction.current = false;
+      } else if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = prevScroll;
+      }
+    }, 0);
+    
+    onSelectContent({ type: "category", id: category.cat_id });
   };
 
-  const handleDuaClick = (categoryId, categoryName, subcatId, duaId, event) => {
-    event.stopPropagation();
-    // router.push(
-    //   `/duas/${categoryName
-    //     .toLowerCase()
-    //     .replace(
-    //       /\s+/g,
-    //       "-"
-    //     )}?cat=${categoryId}&subcat=${subcatId}&dua=${duaId}`,
-    //   { shallow: true }
-    // );
-    onSelectContent({ type: "dua", id: duaId });
+  const handleSubcategoryClick = (category, subcategory, e) => {
+    e.stopPropagation();
+    const prevScroll = scrollContainerRef.current?.scrollTop;
+    const newState = {
+      category: category.cat_id,
+      subcategory: expandedIds.subcategory === subcategory.subcat_id ? null : subcategory.subcat_id
+    };
+    
+    setExpandedIds(newState);
+    saveState(newState);
+    updateUrl(category.cat_id, category.cat_name_en, subcategory.subcat_id);
+    
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = prevScroll;
+      }
+    }, 0);
+    
+    onSelectContent({ type: "subcategory", id: subcategory.subcat_id });
   };
 
-  // ----------------------------------------------------------------------------------------------------
+  // Helper functions
+  const saveState = (state) => {
+    localStorage.setItem("categoryState", JSON.stringify({
+      categoryId: state.category,
+      subcategoryId: state.subcategory
+    }));
+  };
 
-  const filterCategories = categories.filter((category) =>
+  const updateUrl = (catId, catName, subcatId, duaId) => {
+    const slug = catName.toLowerCase().replace(/\s+/g, "-");
+    let url = `/duas/${slug}?cat=${catId}`;
+    if (subcatId) url += `&subcat=${subcatId}`;
+    if (duaId) url += `&dua=${duaId}`;
+    router.push(url, undefined, { shallow: true });
+  };
+
+  // Filter and data processing functions
+  const filteredCategories = data.categories.filter(category =>
     category.cat_name_en.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getUniqueCategories = (categories) => {
-    const seen = new Set();
-    return categories.filter((category) => {
-      const duplicate = seen.has(category.cat_id);
-      seen.add(category.cat_id);
-      return !duplicate;
-    });
-  };
+  const uniqueCategories = [...new Map(
+    filteredCategories.map(item => [item.cat_id, item])
+  ).values()];
 
-  const uniqueFilteredCategories = getUniqueCategories(filterCategories);
+  const getSubcategories = (catId) => 
+    data.subcategories.filter(sub => sub.cat_id === catId);
 
-  const getSubcategoriesForCategory = (categoryId) => {
-    return subcategories.filter((sub) => sub.cat_id === categoryId);
-  };
-
-  const getDuasForSubcategory = (subcategoryId) => {
-    return duas.filter((dua) => dua.subcat_id === subcategoryId);
-  };
+  const getDuas = (subcatId) => 
+    data.duas.filter(dua => dua.subcat_id === subcatId);
 
   return (
     <div className="bg-white h-[840px] rounded-lg shadow-lg p-4">
@@ -163,22 +157,21 @@ const Categories = ({ onSelectContent }) => {
         <FaSearch className="absolute top-3 right-3 text-gray-400" />
       </div>
 
-      <div className="overflow-y-auto h-[60vh]">
-        {uniqueFilteredCategories.map((category, catIndex) => (
+      <div className="overflow-y-auto h-[60vh]" ref={scrollContainerRef}>
+        {uniqueCategories.map((category) => (
           <div
-            key={`category-${category.cat_id}-${catIndex}`}
+            key={`category-${category.cat_id}`}
+            ref={el => categoryRefs.current[category.cat_id] = el}
             className="border-b pb-4 mb-4 last:border-b-0 last:pb-0"
           >
             <div
               className="flex items-center justify-between mb-2 cursor-pointer"
-              onClick={() => handleCategoryClick(category.cat_id)}
+              onClick={() => handleCategoryClick(category)}
             >
               <div className="flex items-center gap-2">
                 <FiLayers className="text-2xl text-green-500" />
                 <div>
-                  <h3 className="text-lg font-semibold">
-                    {category.cat_name_en}
-                  </h3>
+                  <h3 className="text-lg font-semibold">{category.cat_name_en}</h3>
                   <p className="text-sm text-gray-500">
                     Subcategory: {category.no_of_subcat}
                   </p>
@@ -189,74 +182,56 @@ const Categories = ({ onSelectContent }) => {
               </span>
             </div>
 
-            {expandedCategoryId === category.cat_id && (
+            {expandedIds.category === category.cat_id && (
               <ul className="pl-8 text-sm text-gray-600">
-                {getSubcategoriesForCategory(category.cat_id).map(
-                  (subcat, subcatIndex) => (
-                    <li
-                      key={`subcat-${category.cat_id}-${subcat.subcat_id}-${subcatIndex}`}
-                      className="my-2 relative"
+                {getSubcategories(category.cat_id).map((subcategory) => (
+                  <li
+                    key={`subcat-${subcategory.subcat_id}`}
+                    className="my-2 relative"
+                  >
+                    <div
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={(e) => handleSubcategoryClick(category, subcategory, e)}
                     >
-                      <div
-                        className="flex items-center justify-between cursor-pointer"
-                        onClick={(e) =>
-                          handleSubcategoryClick(
-                            category.cat_id,
-                            category.cat_name_en,
-                            subcat.subcat_id,
-                            e
-                          )
-                        }
-                      >
-                        <div className="relative">
-                          <div className="flex items-center gap-2">
-                            {/* Dotted Line */}
-                            <div className="absolute top-[-8px] left-[2px] h-[calc(100%+24px)] border-l-2 border-dotted border-green-500"></div>
-
-                            {/* Green Circle */}
-                            <div className="w-2 h-2 bg-green-500 rounded-full relative z-10"></div>
-
-                            {/* Subcategory Name */}
-                            <span>{subcat.subcat_name_en}</span>
-                          </div>
+                      <div className="relative">
+                        <div className="flex items-center gap-2">
+                          <div className="absolute top-[-8px] left-[2px] h-[calc(100%+24px)] border-l-2 border-dotted border-green-500"></div>
+                          <div className="w-2 h-2 bg-green-500 rounded-full relative z-10"></div>
+                          <span>{subcategory.subcat_name_en}</span>
                         </div>
-
-                        <IoIosArrowForward
-                          className={`transform transition-transform ${
-                            expandedSubcategoryId === subcat.subcat_id
-                              ? "rotate-90"
-                              : ""
-                          }`}
-                        />
                       </div>
+                      <IoIosArrowForward
+                        className={`transform transition-transform ${
+                          expandedIds.subcategory === subcategory.subcat_id ? "rotate-90" : ""
+                        }`}
+                      />
+                    </div>
 
-                      {expandedSubcategoryId === subcat.subcat_id && (
-                        <ul className="pl-8 list-decimal text-gray-600 mt-2 relative">
-                          <div className="absolute top-0 left-[2px] h-full border-l-2 border-dotted border-green-500"></div>
-                          {getDuasForSubcategory(subcat.subcat_id).map(
-                            (dua, duaIndex) => (
-                              <li
-                                key={`dua-${subcat.subcat_id}-${dua.dua_id}-${duaIndex}`}
-                                className="my-1 cursor-pointer hover:text-green-600"
-                                onClick={(e) =>
-                                  handleDuaClick(
-                                    category.cat_id,
-                                    category.cat_name_en,
-                                    subcat.subcat_id,
-                                    dua.dua_id,
-                                    e
-                                  )
-                                }
-                              >
-                                {dua.dua_name_en}
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      )}
-                    </li>
-                  )
-                )}
+                    {expandedIds.subcategory === subcategory.subcat_id && (
+                      <ul className="pl-8 list-decimal text-gray-600 mt-2 relative">
+                        <div className="absolute top-0 left-[2px] h-full border-l-2 border-dotted border-green-500"></div>
+                        {getDuas(subcategory.subcat_id).map((dua) => (
+                          <li
+                            key={`dua-${dua.dua_id}`}
+                            className="my-1 cursor-pointer hover:text-green-600"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              updateUrl(
+                                category.cat_id,
+                                category.cat_name_en,
+                                subcategory.subcat_id,
+                                dua.dua_id
+                              );
+                              onSelectContent({ type: "dua", id: dua.dua_id });
+                            }}
+                          >
+                            {dua.dua_name_en}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
               </ul>
             )}
           </div>
