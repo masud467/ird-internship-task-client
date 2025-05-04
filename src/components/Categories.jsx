@@ -10,14 +10,14 @@ const Categories = ({ onSelectContent }) => {
   const [data, setData] = useState({
     categories: [],
     subcategories: [],
-    duas: []
+    duas: [],
   });
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState({
     category: null,
-    subcategory: null
+    subcategory: null,
   });
-  
+
   const scrollContainerRef = useRef(null);
   const categoryRefs = useRef({});
   const isInitialInteraction = useRef(true);
@@ -27,7 +27,7 @@ const Categories = ({ onSelectContent }) => {
     if (savedState) {
       const { categoryId, subcategoryId } = JSON.parse(savedState);
       setExpandedIds({ category: categoryId, subcategory: subcategoryId });
-      
+
       setTimeout(() => {
         if (categoryId && categoryRefs.current[categoryId]) {
           scrollToElement(categoryRefs.current[categoryId]);
@@ -38,9 +38,15 @@ const Categories = ({ onSelectContent }) => {
     const fetchData = async () => {
       try {
         const [categories, subcategories, duas] = await Promise.all([
-          fetch("http://localhost:3003/categories").then(res => res.json()),
-          fetch("http://localhost:3003/subcategories").then(res => res.json()),
-          fetch("http://localhost:3003/duas").then(res => res.json())
+          fetch(
+            "https://ird-foundation-task-server.vercel.app/categories"
+          ).then((res) => res.json()),
+          fetch(
+            "https://ird-foundation-task-server.vercel.app/subcategories"
+          ).then((res) => res.json()),
+          fetch("https://ird-foundation-task-server.vercel.app/duas").then(
+            (res) => res.json()
+          ),
         ]);
         setData({ categories, subcategories, duas });
       } catch (error) {
@@ -52,13 +58,16 @@ const Categories = ({ onSelectContent }) => {
 
   const scrollToElement = (element) => {
     if (!scrollContainerRef.current || !element) return;
-    
+
     const container = scrollContainerRef.current;
     const elementRect = element.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
-    
+
     // Only scroll if element is not fully visible
-    if (elementRect.top < containerRect.top || elementRect.bottom > containerRect.bottom) {
+    if (
+      elementRect.top < containerRect.top ||
+      elementRect.bottom > containerRect.bottom
+    ) {
       element.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   };
@@ -66,14 +75,15 @@ const Categories = ({ onSelectContent }) => {
   const handleCategoryClick = (category) => {
     const prevScroll = scrollContainerRef.current?.scrollTop;
     const newState = {
-      category: expandedIds.category === category.cat_id ? null : category.cat_id,
-      subcategory: null
+      category:
+        expandedIds.category === category.cat_id ? null : category.cat_id,
+      subcategory: null,
     };
-    
+
     setExpandedIds(newState);
     saveState(newState);
     updateUrl(category.cat_id, category.cat_name_en);
-    
+
     setTimeout(() => {
       if (isInitialInteraction.current) {
         if (categoryRefs.current[category.cat_id]) {
@@ -84,7 +94,7 @@ const Categories = ({ onSelectContent }) => {
         scrollContainerRef.current.scrollTop = prevScroll;
       }
     }, 0);
-    
+
     onSelectContent({ type: "category", id: category.cat_id });
   };
 
@@ -93,28 +103,34 @@ const Categories = ({ onSelectContent }) => {
     const prevScroll = scrollContainerRef.current?.scrollTop;
     const newState = {
       category: category.cat_id,
-      subcategory: expandedIds.subcategory === subcategory.subcat_id ? null : subcategory.subcat_id
+      subcategory:
+        expandedIds.subcategory === subcategory.subcat_id
+          ? null
+          : subcategory.subcat_id,
     };
-    
+
     setExpandedIds(newState);
     saveState(newState);
     updateUrl(category.cat_id, category.cat_name_en, subcategory.subcat_id);
-    
+
     setTimeout(() => {
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = prevScroll;
       }
     }, 0);
-    
+
     onSelectContent({ type: "subcategory", id: subcategory.subcat_id });
   };
 
   // Helper functions
   const saveState = (state) => {
-    localStorage.setItem("categoryState", JSON.stringify({
-      categoryId: state.category,
-      subcategoryId: state.subcategory
-    }));
+    localStorage.setItem(
+      "categoryState",
+      JSON.stringify({
+        categoryId: state.category,
+        subcategoryId: state.subcategory,
+      })
+    );
   };
 
   const updateUrl = (catId, catName, subcatId, duaId) => {
@@ -126,19 +142,19 @@ const Categories = ({ onSelectContent }) => {
   };
 
   // Filter and data processing functions
-  const filteredCategories = data.categories.filter(category =>
+  const filteredCategories = data.categories.filter((category) =>
     category.cat_name_en.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const uniqueCategories = [...new Map(
-    filteredCategories.map(item => [item.cat_id, item])
-  ).values()];
+  const uniqueCategories = [
+    ...new Map(filteredCategories.map((item) => [item.cat_id, item])).values(),
+  ];
 
-  const getSubcategories = (catId) => 
-    data.subcategories.filter(sub => sub.cat_id === catId);
+  const getSubcategories = (catId) =>
+    data.subcategories.filter((sub) => sub.cat_id === catId);
 
-  const getDuas = (subcatId) => 
-    data.duas.filter(dua => dua.subcat_id === subcatId);
+  const getDuas = (subcatId) =>
+    data.duas.filter((dua) => dua.subcat_id === subcatId);
 
   return (
     <div className="bg-white h-[840px] rounded-lg shadow-lg p-4">
@@ -161,7 +177,7 @@ const Categories = ({ onSelectContent }) => {
         {uniqueCategories.map((category) => (
           <div
             key={`category-${category.cat_id}`}
-            ref={el => categoryRefs.current[category.cat_id] = el}
+            ref={(el) => (categoryRefs.current[category.cat_id] = el)}
             className="border-b pb-4 mb-4 last:border-b-0 last:pb-0"
           >
             <div
@@ -171,7 +187,9 @@ const Categories = ({ onSelectContent }) => {
               <div className="flex items-center gap-2">
                 <FiLayers className="text-2xl text-green-500" />
                 <div>
-                  <h3 className="text-lg font-semibold">{category.cat_name_en}</h3>
+                  <h3 className="text-lg font-semibold">
+                    {category.cat_name_en}
+                  </h3>
                   <p className="text-sm text-gray-500">
                     Subcategory: {category.no_of_subcat}
                   </p>
@@ -191,7 +209,9 @@ const Categories = ({ onSelectContent }) => {
                   >
                     <div
                       className="flex items-center justify-between cursor-pointer"
-                      onClick={(e) => handleSubcategoryClick(category, subcategory, e)}
+                      onClick={(e) =>
+                        handleSubcategoryClick(category, subcategory, e)
+                      }
                     >
                       <div className="relative">
                         <div className="flex items-center gap-2">
@@ -202,7 +222,9 @@ const Categories = ({ onSelectContent }) => {
                       </div>
                       <IoIosArrowForward
                         className={`transform transition-transform ${
-                          expandedIds.subcategory === subcategory.subcat_id ? "rotate-90" : ""
+                          expandedIds.subcategory === subcategory.subcat_id
+                            ? "rotate-90"
+                            : ""
                         }`}
                       />
                     </div>
