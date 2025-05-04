@@ -36,10 +36,10 @@ const Main = () => {
       try {
         const [duasResponse, categoriesResponse, subcategoriesResponse] =
           await Promise.all([
-            fetch("https://ird-foundation-task-server.vercel.app/duas"),
-            fetch("https://ird-foundation-task-server.vercel.app/categories"),
+            fetch("https://ird-internship-task-server.onrender.com/duas"),
+            fetch("https://ird-internship-task-server.onrender.com/categories"),
             fetch(
-              "https://ird-foundation-task-server.vercel.app/subcategories"
+              "https://ird-internship-task-server.onrender.com/subcategories"
             ),
           ]);
 
